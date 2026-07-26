@@ -26,8 +26,26 @@ All scripts are idempotent, non-interactive, and refuse to touch a submodule wit
 
 - `SKILL.md` for the full agent-facing contract.
 - `references/submodule-guide.md` for the underlying model.
+- `references/design.md` for the security model and non-obvious design decisions.
 - `references/troubleshooting.md` for the common failure modes.
 - `examples/install-translation.md` for a worked example.
+
+## Tests
+
+A [bats-core](https://github.com/bats-core/bats-core) test suite lives under `tests/`. It covers install, update, remove, list, and doctor, including the regression paths documented in `references/design.md`. Tests use local bare repos as fake remotes and require no network access.
+
+```bash
+# install bats: https://github.com/bats-core/bats-core#installation
+bats tests/
+```
+
+CI runs the suite on every push and PR via `.github/workflows/ci.yml`.
+
+## Configuration
+
+| Environment variable | Purpose |
+|---|---|
+| `GHSM_SKILLS_DIR` | Override the auto-detected skills directory. Absolute or relative to the workspace root. Defaults to `workspace/skills/`, or `skills/` when that already exists at the workspace root. |
 
 ## Install this skill itself
 

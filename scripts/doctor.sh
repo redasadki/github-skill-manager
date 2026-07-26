@@ -27,6 +27,12 @@ if [ "${#paths[@]}" -eq 0 ]; then
 fi
 
 for p in "${paths[@]}"; do
+  # Validate the path before letting it flow into any command below.
+  if ! validate_gitmodules_path "${root}" "${p}" 2>/dev/null; then
+    report "malformed .gitmodules entry: '${p}'" "edit .gitmodules and fix or remove the invalid entry"
+    continue
+  fi
+
   name="$(basename "${p}")"
   echo "checking ${p}"
   url="$(git config -f .gitmodules --get "submodule.${p}.url" || echo "")"
@@ -43,7 +49,7 @@ for p in "${paths[@]}"; do
   fi
 
   # Pointer vs HEAD.
-  outer_ptr="$(git ls-tree HEAD -- "${p}" | awk '{print $3}')"
+  outer_ptr="$(git ls-tree HEAD -- "${p}" 2>/dev/null | awk '{print $3}')"
   inner_head="$(cd "${root}/${p}" && git rev-parse HEAD)"
   if [ -n "${outer_ptr}" ] && [ "${outer_ptr}" != "${inner_head}" ]; then
     report "pointer drift on '${p}': outer=${outer_ptr:0:7} inner=${inner_head:0:7}" \
@@ -55,8 +61,8 @@ for p in "${paths[@]}"; do
     report "submodule '${p}' has uncommitted changes" "cd ${p} && git status ; commit and push, then bump the outer pointer"
   fi
 
-  # Unpushed commits.
-  if ( cd "${root}/${p}" && git rev-parse @{u} >/dev/null 2>&1 ); then
+  # Unpushed commits (only when an upstream is configured).
+  if ( cd "${root}/${p}" && git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1 ); then
     ahead="$(cd "${root}/${p}" && git rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)"
     if [ "${ahead}" -gt 0 ]; then
       report "submodule '${p}' has ${ahead} unpushed commit(s)" "cd ${p} && git push"
@@ -68,7 +74,6 @@ for p in "${paths[@]}"; do
     report "submodule '${p}' has no SKILL.md at the root" "check the repo layout; some skills nest under a subdirectory"
   else
     if command -v agentskills >/dev/null 2>&1; then
-      # Absolute path so the validator can resolve the directory name.
       if ! agentskills validate "${root}/${p}" >/dev/null 2>&1; then
         report "skill '${name}' fails agentskills validation" "agentskills validate ${root}/${p}"
       fi
@@ -76,7 +81,7 @@ for p in "${paths[@]}"; do
   fi
 
   # Remote reachability.
-  if ! git ls-remote "${url}" >/dev/null 2>&1; then
+  if [ -n "${url}" ] && ! git ls-remote "${url}" >/dev/null 2>&1; then
     report "remote unreachable for '${p}' (${url})" "check network and gh auth (gh auth status). if the repo moved, edit .gitmodules and run: git submodule sync -- ${p}"
   fi
 done

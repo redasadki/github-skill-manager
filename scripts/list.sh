@@ -19,6 +19,7 @@ fi
 
 printf "%-28s %-12s %-8s %s\n" "NAME" "PINNED" "BRANCH" "REMOTE"
 for p in "${paths[@]}"; do
+  validate_gitmodules_path "${root}" "${p}"
   name="$(basename "${p}")"
   url="$(git config -f .gitmodules --get "submodule.${p}.url" || echo "?")"
   branch="$(git config -f .gitmodules --get "submodule.${p}.branch" || echo "-")"
@@ -27,7 +28,6 @@ for p in "${paths[@]}"; do
   else
     sha="uninit"
   fi
-  # Compact the remote for display (github.com:owner/repo).
   display_remote="${url}"
   display_remote="${display_remote#https://}"
   display_remote="${display_remote#git@}"

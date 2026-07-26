@@ -3,7 +3,7 @@ name: github-skill-manager
 description: "Install, update, remove, list, and diagnose Agent Skills hosted on GitHub, mounted as git submodules under workspace/skills/. Use this skill when the user says install / add / set up a GitHub skill, update / bump / pull the latest for a skill, remove / uninstall a skill, list installed skills, or diagnose / doctor a skill that is broken or drifted. Handles the two-level commit workflow (commit inside the submodule, then bump the pointer in the outer workspace repo) so both repos stay canonical. Triggers: use the github-skill-manager to set up the new X skill, install the epub2md skill from GitHub, update the translation skill, remove skill Y, list installed GitHub skills, doctor the skill setup, why is the skill directory empty after clone."
 license: MIT
 metadata:
-  version: '0.1.0'
+  version: '0.2.0'
   author: Reda Sadki
   canonical_home: workspace/skills/github-skill-manager
 ---
@@ -217,8 +217,17 @@ git config --global submodule.recurse true
 - Never `rm -rf` a submodule directory as a shortcut for removal. Use `scripts/remove.sh`.
 - Never nest a plain (non-submodule) clone inside the workspace repo. Either it is a submodule or it lives outside the workspace.
 
+## Configuration
+
+Set `GHSM_SKILLS_DIR` to override the auto-detected skills directory. Absolute path or a path relative to the workspace root. Defaults to `workspace/skills/`, or `skills/` when that already exists at the workspace root.
+
+## Skill name rules
+
+The `<name>` argument (implicit or explicit) must match the agentskills specification: 1 to 64 characters, lowercase letters and digits, single hyphens only, no leading, trailing, or consecutive hyphens. The scripts enforce this before calling git so an invalid name fails fast instead of at `agentskills validate`.
+
 ## References
 
 - `references/submodule-guide.md` — the full submodule model, day-to-day workflow, and rationale.
+- `references/design.md` — the security model and non-obvious design decisions.
 - `references/troubleshooting.md` — recipes for the common failure modes.
 - `examples/install-translation.md` — worked example, end to end.
