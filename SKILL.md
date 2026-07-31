@@ -3,7 +3,7 @@ name: github-skill-manager
 description: "Install, update, remove, list, and diagnose Agent Skills hosted on GitHub, mounted as git submodules under workspace/skills/. Use this skill when the user says install / add / set up a GitHub skill, update / bump / pull the latest for a skill, remove / uninstall a skill, list installed skills, or diagnose / doctor a skill that is broken or drifted. Handles the two-level commit workflow (commit inside the submodule, then bump the pointer in the outer workspace repo) so both repos stay canonical. Triggers: use the github-skill-manager to set up the new X skill, install the epub2md skill from GitHub, update the translation skill, remove skill Y, list installed GitHub skills, doctor the skill setup, why is the skill directory empty after clone."
 license: MIT
 metadata:
-  version: '0.2.0'
+  version: '0.2.1'
   author: Reda Sadki
   canonical_home: workspace/skills/github-skill-manager
 ---

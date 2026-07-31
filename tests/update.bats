@@ -82,3 +82,29 @@ teardown() { teardown_workspace; }
   [ "${status}" -ne 0 ]
   assert_output_contains "invalid skill name"
 }
+
+@test "update.sh: refuses to clobber unpushed local commits" {
+  # v0.2.1 clobber guard. Before v0.2.1, a local commit that had not been
+  # pushed passed the guard as long as the working tree was clean. It could
+  # be silently lost when origin/main next advanced. update.sh must now
+  # refuse and mention the number of local commits.
+  make_fake_remote "sample-skill"
+  run_install "${FAKE_URL}"
+  [ "${status}" -eq 0 ]
+
+  # Commit a local change inside the submodule, do not push it.
+  (
+    cd "${WORK}/workspace/skills/sample-skill"
+    git config user.email "test@example.com"
+    git config user.name "Test"
+    git config commit.gpgsign false
+    echo "local" >> SKILL.md
+    git add -A
+    git commit -q -m "local edit"
+  )
+
+  run_update "sample-skill"
+  [ "${status}" -ne 0 ]
+  assert_output_contains "1 local commit"
+  assert_output_contains "refuses to fast-forward"
+}

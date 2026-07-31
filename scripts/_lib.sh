@@ -166,6 +166,77 @@ submodule_names() {
     || true
 }
 
+# Number of commits reachable from HEAD but not from the given upstream ref.
+# Prints 0 when the upstream ref does not exist or cannot be resolved. Callers
+# that need to distinguish "no upstream" from "in sync" should check the
+# upstream ref separately (via `git rev-parse --verify`).
+#
+# Usage: count_local_only <submodule-abs-path> <upstream-ref>
+count_local_only() {
+  local path="$1"
+  local upstream="$2"
+  ( cd "${path}" && git rev-list --count "${upstream}..HEAD" 2>/dev/null ) || echo 0
+}
+
+# Number of commits reachable from the given upstream ref but not from HEAD.
+# Same conventions as count_local_only.
+#
+# Usage: count_remote_only <submodule-abs-path> <upstream-ref>
+count_remote_only() {
+  local path="$1"
+  local upstream="$2"
+  ( cd "${path}" && git rev-list --count "HEAD..${upstream}" 2>/dev/null ) || echo 0
+}
+
+# Read the ghsmPushBranch extension field from .gitmodules for a given
+# submodule path. Prints the empty string when absent.
+#
+# Usage: skill_push_branch <rel-path>
+skill_push_branch() {
+  local rel="$1"
+  [ -f .gitmodules ] || { echo ""; return 0; }
+  git config -f .gitmodules --get "submodule.${rel}.ghsmPushBranch" 2>/dev/null || echo ""
+}
+
+# Read the ghsmPullBranch extension field from .gitmodules for a given
+# submodule path. Falls back to the standard `branch` field, then to the
+# empty string. The caller decides what to do with an empty value.
+#
+# Usage: skill_pull_branch <rel-path>
+skill_pull_branch() {
+  local rel="$1"
+  local v
+  [ -f .gitmodules ] || { echo ""; return 0; }
+  v="$(git config -f .gitmodules --get "submodule.${rel}.ghsmPullBranch" 2>/dev/null || true)"
+  if [ -n "${v}" ]; then
+    echo "${v}"
+    return 0
+  fi
+  git config -f .gitmodules --get "submodule.${rel}.branch" 2>/dev/null || echo ""
+}
+
+# Validate a git branch name at the level we care about: not empty, no
+# whitespace, no leading dash, no `..`, no ASCII control characters, no
+# `~^:?*[\` and no trailing `.lock`. Not as strict as `git check-ref-format`
+# but catches obvious misuse without shelling out to git for each name.
+#
+# Usage: validate_branch_name <branch>
+validate_branch_name() {
+  local b="$1"
+  [ -n "${b}" ] || die "branch name cannot be empty."
+  case "${b}" in
+    -*)   die "invalid branch name '${b}': cannot start with '-'." ;;
+    *..*) die "invalid branch name '${b}': cannot contain '..'." ;;
+    *.lock) die "invalid branch name '${b}': cannot end with '.lock'." ;;
+  esac
+  if [[ "${b}" =~ [[:space:]] ]]; then
+    die "invalid branch name '${b}': cannot contain whitespace."
+  fi
+  if [[ "${b}" =~ [~\^:\?\*\[\\] ]]; then
+    die "invalid branch name '${b}': contains one of ~ ^ : ? * [ \\."
+  fi
+}
+
 # Validate that a path read from .gitmodules is well-formed and lives under
 # the configured skills directory. Rejects absolute paths, path traversal,
 # and anything outside the skills directory. Dies with a clear message.

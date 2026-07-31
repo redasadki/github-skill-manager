@@ -2,6 +2,17 @@
 
 All notable changes are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] — 2026-07-31
+
+### Fixed
+
+- **Clobber-prevention gap in `update.sh`.** The previous guard only refused to touch a submodule with a dirty working tree. Local commits that existed only inside the submodule (never pushed) passed the guard and were silently at risk: the next upstream advance produced a fatal fast-forward error, and until then the local commits appeared safe. `update.sh` now fetches origin, resolves the upstream branch from `submodule.<path>.ghsmPullBranch`, then `submodule.<path>.branch`, then `origin/HEAD`, and refuses to proceed when `git rev-list --count origin/<branch>..HEAD` is greater than zero. The error message names the number of local commits and points at the two ways forward: push them by hand, or configure two-way sync (v0.3.0). The old shell pattern `git pull --ff-only` inside the submodule was replaced with `git fetch` plus an explicit `git merge --ff-only` against the resolved upstream ref so the branch used is auditable in the error output.
+- **Update against a non-main default branch.** `update.sh` used to assume `origin/main` implicitly through `git pull --ff-only`. It now reads the upstream from `.gitmodules` and falls back to `origin/HEAD`, so skills that publish from `master`, `trunk`, or a release branch work without special-casing.
+
+### Added
+
+- Helpers in `scripts/_lib.sh`: `count_local_only`, `count_remote_only`, `skill_push_branch`, `skill_pull_branch`, `validate_branch_name`. These are the building blocks for the v0.3.0 two-way sync work; v0.2.1 uses them only for the clobber guard in `update.sh`.
+
 ## [0.2.0] — 2026-07-26
 
 ### Fixed
