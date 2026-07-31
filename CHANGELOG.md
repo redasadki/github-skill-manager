@@ -2,6 +2,28 @@
 
 All notable changes are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-07-31
+
+### Added
+
+- **Two-way sync (`scripts/sync.sh`).** New subcommand that syncs one skill or every installed skill in both directions between local and origin. For each skill, it counts local-only and remote-only commits against the configured pull branch and picks one of four actions: in sync (no-op), push only (push HEAD to the push branch, bump the outer pointer), pull only (fast-forward, bump the outer pointer), or diverged (print counts and three options, exit 1). Skills without a push branch configured downgrade cleanly to `update.sh` semantics.
+- **Per-skill branch configuration in `.gitmodules`.** Two extension fields, `submodule.<path>.ghsmPullBranch` and `submodule.<path>.ghsmPushBranch`, record where to pull upstream improvements from and where to push local commits. The convention for the push branch is `openclaw/<version>` so a host can maintain its host-specific changes on a version-tagged branch in the same repo. Git ignores unknown submodule fields, so a workspace that does not use two-way sync sees them as inert.
+- **`install.sh --pull-branch`, `--push-branch`, and `--reconfigure` flags.** Enable two-way sync at install time, or upgrade an already-installed skill to two-way sync without cloning again. `--reconfigure` writes only to `.gitmodules` and best-effort creates the push branch on origin if it does not exist.
+- **`references/two-way-sync.md`.** Full conceptual model: branch model, state machine, retroactive migration procedure, and when the tool deliberately refuses to automate a decision.
+- **`examples/openclaw-branch.md`.** End-to-end worked example that installs a skill with a `main` pull branch and an `openclaw/2026.7.x` push branch, makes a host-specific edit, syncs, later pulls an upstream change into a diverged state, resolves it with a merge, and syncs again.
+- **bats coverage for the new paths.** New `tests/sync.bats` covers all four sync states. `tests/update.bats` gets a clobber-guard regression. `tests/install.bats` and `tests/doctor.bats` cover the flag parsing and configuration checks.
+
+### Changed
+
+- **`update.sh` now reads `ghsmPullBranch` before falling back to `branch` or `origin/HEAD`.** Skills that publish from a non-`main` branch (`master`, `trunk`, a release branch) no longer need special-casing.
+- **`list.sh` shows a `SYNC` column instead of a plain `BRANCH` column.** One-way skills read as `pull:<branch>`; two-way skills read as `pull:<a>/push:<b>`.
+- **`doctor.sh` now reports two-way sync misconfiguration.** Detects a push branch with no pull branch, and a push branch equal to the pull branch (which defeats the split). Unpushed-commit warnings now distinguish between skills that have a push branch configured (suggest `sync.sh`) and skills that do not (suggest `install.sh --reconfigure` or a manual push).
+
+### Editorial
+
+- **`SKILL.md` reorganized.** The description and triggers now name sync, push, and two-way sync explicitly. A dedicated Two-way sync section documents the branch model and links to `references/two-way-sync.md` for the full conceptual model.
+- **`README.md` updated.** New sync column in the scripts table, new links to the two-way sync docs and openclaw example.
+
 ## [0.2.1] — 2026-07-31
 
 ### Fixed

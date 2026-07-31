@@ -96,3 +96,77 @@ teardown() { teardown_workspace; }
   [ -f "${WORK}/workspace/skills/skill-a/SKILL.md" ]
   [ -f "${WORK}/workspace/skills/skill-b/SKILL.md" ]
 }
+
+@test "install.sh --push-branch: writes ghsmPushBranch and creates the branch on origin" {
+  make_fake_remote "sample-skill"
+
+  run_install --push-branch "openclaw/2026.7.x" "${FAKE_URL}"
+  [ "${status}" -eq 0 ]
+  assert_output_contains "recorded ghsmPushBranch=openclaw/2026.7.x"
+
+  # .gitmodules records the extension field.
+  run git -C "${WORK}" config -f .gitmodules --get "submodule.workspace/skills/sample-skill.ghsmPushBranch"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "openclaw/2026.7.x" ]
+
+  # The push branch exists on the fake remote.
+  run git -C "${WORK}/workspace/skills/sample-skill" ls-remote origin "refs/heads/openclaw/2026.7.x"
+  [ "${status}" -eq 0 ]
+  [ -n "${output}" ]
+}
+
+@test "install.sh --pull-branch: writes ghsmPullBranch" {
+  make_fake_remote "sample-skill"
+
+  run_install --pull-branch "main" "${FAKE_URL}"
+  [ "${status}" -eq 0 ]
+  assert_output_contains "recorded ghsmPullBranch=main"
+
+  run git -C "${WORK}" config -f .gitmodules --get "submodule.workspace/skills/sample-skill.ghsmPullBranch"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "main" ]
+}
+
+@test "install.sh --reconfigure: sets push branch on an already-installed skill" {
+  make_fake_remote "sample-skill"
+
+  # Install one-way first.
+  run_install "${FAKE_URL}"
+  [ "${status}" -eq 0 ]
+
+  # Then reconfigure for two-way.
+  run_install --reconfigure --push-branch "openclaw/2026.7.x" "sample-skill"
+  [ "${status}" -eq 0 ]
+  assert_output_contains "recorded ghsmPushBranch=openclaw/2026.7.x"
+
+  run git -C "${WORK}" config -f .gitmodules --get "submodule.workspace/skills/sample-skill.ghsmPushBranch"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "openclaw/2026.7.x" ]
+
+  # Outer repo commit records the configuration change.
+  run git -C "${WORK}" log --oneline
+  assert_output_contains "Configure sample-skill skill for two-way sync"
+}
+
+@test "install.sh --reconfigure: requires at least one branch flag" {
+  make_fake_remote "sample-skill"
+  run_install "${FAKE_URL}"
+  [ "${status}" -eq 0 ]
+
+  run_install --reconfigure "sample-skill"
+  [ "${status}" -ne 0 ]
+  assert_output_contains "requires --pull-branch and/or --push-branch"
+}
+
+@test "install.sh: rejects unknown flag" {
+  run_install --nonsense "redasadki/whatever"
+  [ "${status}" -ne 0 ]
+  assert_output_contains "unknown flag"
+}
+
+@test "install.sh --push-branch: rejects malformed branch name" {
+  make_fake_remote "sample-skill"
+  run_install --push-branch "bad branch" "${FAKE_URL}"
+  [ "${status}" -ne 0 ]
+  assert_output_contains "invalid branch name"
+}

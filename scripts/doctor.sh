@@ -61,12 +61,47 @@ for p in "${paths[@]}"; do
     report "submodule '${p}' has uncommitted changes" "cd ${p} && git status ; commit and push, then bump the outer pointer"
   fi
 
-  # Unpushed commits (only when an upstream is configured).
+  # Unpushed commits, plus two-way sync configuration checks.
+  #
+  # Order of preference for the upstream ref to compare against:
+  #   1. tracked upstream (`@{u}`) when set,
+  #   2. origin/<ghsmPullBranch>, origin/<branch>, in that order,
+  #   3. origin/HEAD as a last resort.
+  pull_branch="$(skill_pull_branch "${p}")"
+  push_branch="$(skill_push_branch "${p}")"
+
+  upstream=""
   if ( cd "${root}/${p}" && git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1 ); then
-    ahead="$(cd "${root}/${p}" && git rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)"
+    upstream="$(cd "${root}/${p}" && git rev-parse --abbrev-ref '@{u}')"
+  elif [ -n "${pull_branch}" ]; then
+    upstream="origin/${pull_branch}"
+  elif ( cd "${root}/${p}" && git rev-parse --verify --quiet 'refs/remotes/origin/HEAD' >/dev/null ); then
+    upstream="$(cd "${root}/${p}" && git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)"
+  fi
+
+  if [ -n "${upstream}" ]; then
+    ahead="$(count_local_only "${root}/${p}" "${upstream}")"
     if [ "${ahead}" -gt 0 ]; then
-      report "submodule '${p}' has ${ahead} unpushed commit(s)" "cd ${p} && git push"
+      if [ -n "${push_branch}" ]; then
+        report "submodule '${p}' has ${ahead} unpushed commit(s) (two-way sync configured)" \
+          "bash workspace/skills/github-skill-manager/scripts/sync.sh ${name}"
+      else
+        report "submodule '${p}' has ${ahead} unpushed commit(s) (no push branch configured)" \
+          "push manually with 'cd ${p} && git push origin HEAD:${pull_branch:-main}', or configure two-way sync: bash workspace/skills/github-skill-manager/scripts/install.sh --reconfigure --push-branch <branch> ${name}"
+      fi
     fi
+  fi
+
+  # Two-way sync misconfiguration: a push branch is set but the pull
+  # branch is not, or the push and pull branches are identical (which
+  # defeats the whole point of the split).
+  if [ -n "${push_branch}" ] && [ -z "${pull_branch}" ]; then
+    report "submodule '${p}' has ghsmPushBranch=${push_branch} but no ghsmPullBranch" \
+      "bash workspace/skills/github-skill-manager/scripts/install.sh --reconfigure --pull-branch <branch> ${name}"
+  fi
+  if [ -n "${push_branch}" ] && [ "${push_branch}" = "${pull_branch}" ]; then
+    report "submodule '${p}' has ghsmPushBranch=ghsmPullBranch=${push_branch} (defeats two-way sync)" \
+      "set them to different branches, for example ghsmPullBranch=main and ghsmPushBranch=openclaw/2026.7.x"
   fi
 
   # SKILL.md presence.

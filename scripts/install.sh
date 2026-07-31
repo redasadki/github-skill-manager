@@ -1,27 +1,49 @@
 #!/usr/bin/env bash
-# Install a GitHub-hosted skill as a submodule under the skills directory.
+# Install a GitHub-hosted skill as a submodule under the skills directory,
+# or reconfigure an already-installed skill for two-way sync.
 #
 # Usage:
-#   install.sh <repo> [<name>]
+#   install.sh [flags] <repo> [<name>]
+#   install.sh --reconfigure [flags] <name>
 #
 # <repo> may be:
 #   - owner/name              e.g. redasadki/translation
 #   - https://github.com/...  full HTTPS URL
 #   - git@github.com:...      full SSH URL
+#   - file:///path/to/repo    for tests and self-hosted mirrors
 #
 # <name> defaults to the repo basename. Pass it explicitly only when the
 # desired mount name differs from the repo name.
 #
-# On success, this script has:
-#   - added <skills-dir>/<name> as a submodule,
-#   - recorded it in .gitmodules,
-#   - initialized the working tree,
-#   - validated the skill with `agentskills validate` when available,
-#   - committed the submodule pointer in the outer workspace repo.
+# Flags (all optional):
+#   --pull-branch <branch>   Branch on origin to pull upstream improvements
+#                            from. Written to .gitmodules as ghsmPullBranch.
+#                            Also used as the initial submodule branch. If
+#                            omitted, the remote's default branch is used.
+#   --push-branch <branch>   Branch on origin where local commits should
+#                            be pushed. Written to .gitmodules as
+#                            ghsmPushBranch. If the branch does not yet
+#                            exist on origin, it is created from the pull
+#                            branch. Enables two-way sync via sync.sh.
+#   --reconfigure            Do not clone. Just update .gitmodules for an
+#                            already-installed skill. Requires <name> in
+#                            the positional argument slot instead of <repo>.
+#
+# On a fresh install, this script:
+#   - adds <skills-dir>/<name> as a submodule tracking the pull branch,
+#   - writes ghsmPullBranch and ghsmPushBranch to .gitmodules when set,
+#   - creates the push branch on origin from the pull branch when it does
+#     not already exist,
+#   - initializes the working tree,
+#   - validates the skill with `agentskills validate` when available,
+#   - commits the submodule pointer plus the .gitmodules changes.
+#
+# On --reconfigure, this script only writes .gitmodules and commits.
 #
 # You still need to `git push` the outer repo yourself.
 #
-# On partial failure, the script rolls back so a subsequent run can retry.
+# On partial failure of a fresh install, the script rolls back so a
+# subsequent run can retry.
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,7 +52,117 @@ source "${SCRIPT_DIR}/_lib.sh"
 
 require_cmd git
 
-[ $# -ge 1 ] || die "usage: install.sh <repo> [<name>]"
+usage() {
+  cat >&2 <<EOF
+usage: install.sh [--pull-branch <b>] [--push-branch <b>] <repo> [<name>]
+       install.sh --reconfigure [--pull-branch <b>] [--push-branch <b>] <name>
+EOF
+  exit 1
+}
+
+pull_branch_arg=""
+push_branch_arg=""
+reconfigure=0
+
+# Parse flags. The remaining positional arguments become $1, $2 after the
+# loop. bash's built-in flag parsing is deliberately explicit here so the
+# error messages name the actual flag.
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --pull-branch)
+      [ $# -ge 2 ] || die "--pull-branch requires a value."
+      pull_branch_arg="$2"
+      validate_branch_name "${pull_branch_arg}"
+      shift 2
+      ;;
+    --push-branch)
+      [ $# -ge 2 ] || die "--push-branch requires a value."
+      push_branch_arg="$2"
+      validate_branch_name "${push_branch_arg}"
+      shift 2
+      ;;
+    --reconfigure)
+      reconfigure=1
+      shift
+      ;;
+    --help|-h)
+      usage
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      die "unknown flag: '$1'. see --help."
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+[ $# -ge 1 ] || usage
+
+root="$(workspace_root)"
+cd "${root}"
+
+# --- Reconfigure branch --------------------------------------------------
+#
+# In reconfigure mode, the positional argument is the skill name, not a
+# repo reference. This lets already-installed skills opt into two-way
+# sync without a fresh clone.
+if [ "${reconfigure}" -eq 1 ]; then
+  name="$1"
+  validate_skill_name "${name}"
+  rel_path="$(skill_rel_path "${root}" "${name}")"
+  is_submodule_path "${rel_path}" || die "'${name}' is not an installed submodule at '${rel_path}'."
+
+  changed=0
+  if [ -n "${pull_branch_arg}" ]; then
+    git config -f .gitmodules "submodule.${rel_path}.ghsmPullBranch" "${pull_branch_arg}"
+    changed=1
+    info "recorded ghsmPullBranch=${pull_branch_arg} for ${rel_path}"
+  fi
+  if [ -n "${push_branch_arg}" ]; then
+    git config -f .gitmodules "submodule.${rel_path}.ghsmPushBranch" "${push_branch_arg}"
+    changed=1
+    info "recorded ghsmPushBranch=${push_branch_arg} for ${rel_path}"
+
+    # Best-effort: create the push branch on origin if it does not exist,
+    # so the very first sync.sh does not fail on a missing ref. We only
+    # try when the submodule is initialized; when it is not, this can be
+    # deferred until the user runs it.
+    if [ -e "${root}/${rel_path}/.git" ]; then
+      if ! ( cd "${root}/${rel_path}" && git fetch --quiet origin ); then
+        info "warning: could not fetch origin for '${rel_path}'; skipping push-branch creation."
+      elif ( cd "${root}/${rel_path}" && git rev-parse --verify --quiet "refs/remotes/origin/${push_branch_arg}" >/dev/null ); then
+        info "push branch origin/${push_branch_arg} already exists"
+      else
+        # Seed the push branch from the current HEAD so it exists on origin.
+        info "creating origin/${push_branch_arg} from local HEAD"
+        if ! ( cd "${root}/${rel_path}" && git push --quiet origin "HEAD:refs/heads/${push_branch_arg}" ); then
+          info "warning: could not create origin/${push_branch_arg}; create it by hand before the first sync."
+        fi
+      fi
+    fi
+  fi
+
+  [ "${changed}" -eq 1 ] || die "reconfigure requires --pull-branch and/or --push-branch."
+
+  git add .gitmodules
+  if git diff --cached --quiet; then
+    info "no .gitmodules changes to commit."
+  else
+    git commit -m "Configure ${name} skill for two-way sync"
+  fi
+  info ""
+  info "reconfigured: ${rel_path}"
+  info "next:         git push"
+  exit 0
+fi
+
+# --- Fresh install -------------------------------------------------------
+
 repo_input="$1"
 name_override="${2:-}"
 
@@ -45,9 +177,6 @@ repo_base="${parsed[1]}"
 name="${name_override:-${repo_base}}"
 
 validate_skill_name "${name}"
-
-root="$(workspace_root)"
-cd "${root}"
 
 rel_path="$(skill_rel_path "${root}" "${name}")"
 abs_path="${root}/${rel_path}"
@@ -66,6 +195,9 @@ if [ -e "${abs_path}" ]; then
       pinned_sha="$(cd "${abs_path}" && git rev-parse --short HEAD)"
       info "already installed: ${rel_path} -> ${repo_url}"
       info "pinned at: ${pinned_sha}"
+      if [ -n "${pull_branch_arg}" ] || [ -n "${push_branch_arg}" ]; then
+        info "note: to change branch configuration, rerun with --reconfigure."
+      fi
       exit 0
     fi
     die "path '${rel_path}' is a submodule but points at '${existing_url}', not '${repo_url}'."
@@ -79,10 +211,15 @@ if ! git ls-remote "${repo_url}" >/dev/null 2>&1; then
   die "cannot reach '${repo_url}'. check the URL, network, and gh auth (try: gh auth status)."
 fi
 
-# Determine the default branch (fall back to main).
-default_branch="$(git ls-remote --symref "${repo_url}" HEAD 2>/dev/null \
-  | awk '/^ref:/ {sub("refs/heads/","",$2); print $2; exit}')"
-default_branch="${default_branch:-main}"
+# Determine the branch to track on submodule add. Explicit flag wins;
+# otherwise fall back to the remote's default branch.
+if [ -n "${pull_branch_arg}" ]; then
+  track_branch="${pull_branch_arg}"
+else
+  track_branch="$(git ls-remote --symref "${repo_url}" HEAD 2>/dev/null \
+    | awk '/^ref:/ {sub("refs/heads/","",$2); print $2; exit}')"
+  track_branch="${track_branch:-main}"
+fi
 
 # Ensure the parent directory exists.
 mkdir -p "$(dirname "${abs_path}")"
@@ -112,9 +249,34 @@ rollback() {
 }
 trap 'rc=$?; if [ "${rc}" -ne 0 ]; then rollback; fi' EXIT
 
-info "adding submodule at ${rel_path} tracking ${default_branch}"
-git submodule add -b "${default_branch}" "${repo_url}" "${rel_path}"
+info "adding submodule at ${rel_path} tracking ${track_branch}"
+git submodule add -b "${track_branch}" "${repo_url}" "${rel_path}"
 git submodule update --init --recursive -- "${rel_path}"
+
+# Record two-way sync configuration in .gitmodules when the flags were set.
+# ghsmPullBranch is written whenever --pull-branch was passed, even though
+# .gitmodules already has `branch = <track_branch>`; keeping the two keys
+# separate lets us change the pull branch later without also changing the
+# submodule branch, which some git operations use.
+if [ -n "${pull_branch_arg}" ]; then
+  git config -f .gitmodules "submodule.${rel_path}.ghsmPullBranch" "${pull_branch_arg}"
+  info "recorded ghsmPullBranch=${pull_branch_arg}"
+fi
+if [ -n "${push_branch_arg}" ]; then
+  git config -f .gitmodules "submodule.${rel_path}.ghsmPushBranch" "${push_branch_arg}"
+  info "recorded ghsmPushBranch=${push_branch_arg}"
+
+  # Create the push branch on origin if it does not exist yet. We push
+  # HEAD, which at this point equals the pull branch tip.
+  if ( cd "${abs_path}" && git rev-parse --verify --quiet "refs/remotes/origin/${push_branch_arg}" >/dev/null ); then
+    info "push branch origin/${push_branch_arg} already exists"
+  else
+    info "creating origin/${push_branch_arg} from ${track_branch}"
+    if ! ( cd "${abs_path}" && git push --quiet origin "HEAD:refs/heads/${push_branch_arg}" ); then
+      info "warning: could not create origin/${push_branch_arg}. create it manually or check permissions."
+    fi
+  fi
+fi
 
 # Validate the skill with agentskills if the CLI is available.
 # Absolute path so the validator can resolve the directory name.
@@ -144,4 +306,7 @@ trap - EXIT
 info ""
 info "installed: ${rel_path} -> ${repo_url}"
 info "pinned at: ${pinned_sha}"
+if [ -n "${push_branch_arg}" ]; then
+  info "sync mode: two-way (push: ${push_branch_arg}, pull: ${pull_branch_arg:-${track_branch}})"
+fi
 info "next:      git push"

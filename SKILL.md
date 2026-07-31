@@ -1,9 +1,9 @@
 ---
 name: github-skill-manager
-description: "Install, update, remove, list, and diagnose Agent Skills hosted on GitHub, mounted as git submodules under workspace/skills/. Use this skill when the user says install / add / set up a GitHub skill, update / bump / pull the latest for a skill, remove / uninstall a skill, list installed skills, or diagnose / doctor a skill that is broken or drifted. Handles the two-level commit workflow (commit inside the submodule, then bump the pointer in the outer workspace repo) so both repos stay canonical. Triggers: use the github-skill-manager to set up the new X skill, install the epub2md skill from GitHub, update the translation skill, remove skill Y, list installed GitHub skills, doctor the skill setup, why is the skill directory empty after clone."
+description: "Install, update, sync, remove, list, and diagnose Agent Skills hosted on GitHub, mounted as git submodules under workspace/skills/. Use this skill when the user says install / add / set up a GitHub skill, update / bump / pull the latest for a skill, sync a skill two ways with GitHub, push local changes to the skill repo, remove / uninstall a skill, list installed skills, or diagnose / doctor a skill that is broken or drifted. Handles the two-level commit workflow and the two-way sync split between an upstream pull branch and a host-specific push branch (for example openclaw/2026.7.x) so local improvements are not clobbered by upstream fast-forwards. Triggers: use the github-skill-manager to set up the new X skill, install the epub2md skill from GitHub, update the translation skill, sync the translation skill both ways with GitHub, configure two-way sync for a skill, remove skill Y, list installed GitHub skills, doctor the skill setup, why is the skill directory empty after clone."
 license: MIT
 metadata:
-  version: '0.2.1'
+  version: '0.3.0'
   author: Reda Sadki
   canonical_home: workspace/skills/github-skill-manager
 ---
@@ -53,14 +53,15 @@ workspace/
 
 ## Subcommands
 
-This skill exposes five subcommands via `scripts/`. All scripts are idempotent, non-interactive, and return non-zero with a clear message on failure.
+This skill exposes six subcommands via `scripts/`. All scripts are idempotent, non-interactive, and return non-zero with a clear message on failure.
 
 | Command | Purpose |
 |---|---|
-| `scripts/install.sh <repo> [name]` | Add a new skill as a submodule and pin it. |
-| `scripts/update.sh <name\|--all>` | Fast-forward a skill to `origin/main` and bump the outer pointer. |
+| `scripts/install.sh [flags] <repo> [name]` | Add a new skill as a submodule and pin it. Flags: `--pull-branch`, `--push-branch`, `--reconfigure`. |
+| `scripts/update.sh <name\|--all>` | Fast-forward a skill from its pull branch and bump the outer pointer. Refuses to touch a skill with local commits (clobber guard). |
+| `scripts/sync.sh <name\|--all>` | Two-way sync between local and origin. Pushes local commits to the configured push branch and pulls upstream improvements from the pull branch. |
 | `scripts/remove.sh <name>` | Deinit, remove, and delete the submodule cleanly. |
-| `scripts/list.sh` | Print installed GitHub-backed skills and their pinned commits. |
+| `scripts/list.sh` | Print installed GitHub-backed skills, pinned commits, and sync mode. |
 | `scripts/doctor.sh` | Diagnose common problems and print concrete fixes. |
 
 All scripts run from the workspace root. They discover the workspace root automatically via `git rev-parse --show-toplevel`, so you can invoke them from anywhere inside the workspace.
@@ -94,7 +95,7 @@ Steps the agent should perform:
 
 The install script refuses to overwrite an existing directory at that path and refuses to add a submodule whose repo is not reachable via `git ls-remote`.
 
-## Updating a skill
+## Updating a skill (one-way)
 
 Trigger: "update the `<name>` skill", "pull the latest for `<name>`", "bump `<name>`".
 
@@ -110,7 +111,9 @@ bash workspace/skills/github-skill-manager/scripts/update.sh --all
 
 The script:
 
-- Enters the submodule, fast-forwards to `origin/main` via `git pull --ff-only`, and refuses to touch a submodule with uncommitted local changes.
+- Enters the submodule, fetches origin, and fast-forwards to the pull branch (`submodule.<path>.ghsmPullBranch`, then `submodule.<path>.branch`, then `origin/HEAD`).
+- Refuses to touch a submodule with uncommitted changes.
+- Refuses to touch a submodule with local commits that are not on the pull branch. This is the v0.2.1 clobber guard. When the message names local commits, use `sync.sh` instead (if a push branch is configured) or push by hand.
 - Returns to the workspace root, stages the new submodule pointer, and commits it as `Bump <name> skill to <short-sha>` when the SHA actually changed.
 - Prints "already up to date" and exits 0 when the pointer did not move.
 
@@ -120,26 +123,89 @@ The agent should then push:
 git push
 ```
 
+## Two-way sync
+
+Trigger: "sync `<name>` with GitHub", "push my local changes to the `<name>` skill", "the skill has local edits that need to go back to GitHub".
+
+Two-way sync keeps a skill useful both as a shared upstream and as a locally-improved copy. It splits the branches:
+
+- **Pull branch** (`ghsmPullBranch`) is where upstream improvements land. Usually `main`.
+- **Push branch** (`ghsmPushBranch`) is where this host's local commits go. The convention is `openclaw/<version>`, for example `openclaw/2026.7.x`. This ties host-specific work (venv setup, environment variables, adjusted triggers) to a specific OpenClaw release so a future release can maintain its own branch in the same repo.
+
+Enable two-way sync at install time:
+
+```bash
+bash workspace/skills/github-skill-manager/scripts/install.sh \
+  --pull-branch main \
+  --push-branch openclaw/2026.7.x \
+  redasadki/translation
+```
+
+Or on an already-installed skill:
+
+```bash
+bash workspace/skills/github-skill-manager/scripts/install.sh \
+  --reconfigure \
+  --push-branch openclaw/2026.7.x \
+  translation
+```
+
+Then sync:
+
+```bash
+bash workspace/skills/github-skill-manager/scripts/sync.sh <name>
+```
+
+Or for every configured skill:
+
+```bash
+bash workspace/skills/github-skill-manager/scripts/sync.sh --all
+```
+
+The script counts local-only and remote-only commits against the pull branch and picks one of four actions:
+
+| State | Condition | Action |
+|---|---|---|
+| In sync | local-only == 0 and remote-only == 0 | No-op. |
+| Push only | local-only > 0 and remote-only == 0 | Push HEAD to the push branch, bump the outer pointer. |
+| Pull only | local-only == 0 and remote-only > 0 | Fast-forward from the pull branch, bump the outer pointer. |
+| Diverged | Both > 0 | Print counts and three options (merge, rebase, defer), exit 1. |
+
+Skills without a push branch configured behave like `update.sh`: pull only, and any local commit is a hard error. See `references/two-way-sync.md` for the full model and worked examples.
+
 ## Editing a skill from inside the workspace
 
 When the user asks the agent to edit `workspace/skills/<name>/` directly, follow the two-level commit rule:
 
-1. Before editing, run `git pull --rebase` **inside** `workspace/skills/<name>`.
+1. Before editing, sync the skill so local and origin agree:
+   ```bash
+   bash workspace/skills/github-skill-manager/scripts/sync.sh <name>
+   ```
+   For a one-way skill (no push branch), use `update.sh` instead.
 2. Make the edits.
-3. Commit and push inside the submodule:
+3. Commit inside the submodule:
    ```bash
    cd workspace/skills/<name>
    git add -A
    git commit -m "<what changed and why>"
-   git push origin main
    ```
-4. Return to the workspace root and bump the pointer:
+4. Sync the local commit back to origin and bump the outer pointer in one step:
    ```bash
    cd -                                # back to workspace root
-   git add workspace/skills/<name>
-   git commit -m "Bump <name> skill to $(cd workspace/skills/<name> && git rev-parse --short HEAD)"
-   git push
+   bash workspace/skills/github-skill-manager/scripts/sync.sh <name>
+   git push                            # push the outer repo
    ```
+
+For a one-way skill, `sync.sh` refuses to push, and the correct sequence is:
+
+```bash
+cd workspace/skills/<name>
+git push origin main                # or the skill's default branch
+cd -
+git add workspace/skills/<name>
+git commit -m "Bump <name> skill to $(cd workspace/skills/<name> && git rev-parse --short HEAD)"
+git push
+```
 
 Never commit the pointer bump without pushing the inner commit first. If the inner push fails, roll back the outer stage with `git restore --staged workspace/skills/<name>` before doing anything else.
 
@@ -170,10 +236,10 @@ bash workspace/skills/github-skill-manager/scripts/list.sh
 Prints a table:
 
 ```
-NAME                     PINNED       BRANCH   REMOTE
-epub2md                  a9591ab      main     github.com:redasadki/epub2md
-translation              3fa1c8d      main     github.com:redasadki/translation
-github-skill-manager     b2e04af      main     github.com:redasadki/github-skill-manager
+NAME                     PINNED       SYNC                     REMOTE
+epub2md                  a9591ab      pull:main                github.com:redasadki/epub2md
+translation              3fa1c8d      pull:main/push:openclaw/2026.7.x  github.com:redasadki/translation
+github-skill-manager     b2e04af      pull:main                github.com:redasadki/github-skill-manager
 ```
 
 ## Diagnosing problems
@@ -229,5 +295,7 @@ The `<name>` argument (implicit or explicit) must match the agentskills specific
 
 - `references/submodule-guide.md` — the full submodule model, day-to-day workflow, and rationale.
 - `references/design.md` — the security model and non-obvious design decisions.
+- `references/two-way-sync.md` — the branch model, state machine, and retroactive migration.
 - `references/troubleshooting.md` — recipes for the common failure modes.
-- `examples/install-translation.md` — worked example, end to end.
+- `examples/install-translation.md` — worked example, end to end (one-way).
+- `examples/openclaw-branch.md` — worked example, end to end (two-way sync with an openclaw branch).
