@@ -237,9 +237,52 @@ validate_branch_name() {
   fi
 }
 
+# True if the .gitmodules path is one the manager owns: lives under the
+# configured skills directory and has a well-formed skill name as its
+# final component. Returns 1 (silently) otherwise. Callers iterating
+# submodule_names should skip out-of-scope entries with this predicate,
+# so a workspace can freely host non-skill submodules (for example, a
+# `.superpowers/` framework mount) without breaking the manager.
+#
+# Malformed paths (empty, absolute, containing `..`) always return 1.
+# For a hard failure on malformed but claimed-in-scope paths, use
+# validate_gitmodules_path.
+is_in_scope_submodule() {
+  local root="$1"
+  local rel="$2"
+
+  # Reject the obviously bad shapes outright, but silently: an entry we do
+  # not own is not the manager's problem to fix.
+  case "${rel}" in
+    ""|/*|*..*) return 1 ;;
+  esac
+
+  local sd_rel
+  sd_rel="$(skills_dir "${root}")"
+  sd_rel="${sd_rel#${root}/}"
+  case "${rel}" in
+    "${sd_rel}"/*) : ;;
+    *) return 1 ;;
+  esac
+
+  # The final component must be a valid skill name. We check via the same
+  # regex validate_skill_name uses, but silently.
+  local name
+  name="$(basename "${rel}")"
+  local n="${#name}"
+  [ "${n}" -ge 1 ] && [ "${n}" -le 64 ] || return 1
+  [[ "${name}" =~ ${SKILL_NAME_REGEX} ]] || return 1
+
+  return 0
+}
+
 # Validate that a path read from .gitmodules is well-formed and lives under
 # the configured skills directory. Rejects absolute paths, path traversal,
 # and anything outside the skills directory. Dies with a clear message.
+#
+# Use this after is_in_scope_submodule has said yes, or when the caller
+# was given a specific path by the user and expects it to be in scope
+# (for example, install.sh --reconfigure <name>).
 validate_gitmodules_path() {
   local root="$1"
   local rel="$2"

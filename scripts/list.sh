@@ -18,8 +18,13 @@ if [ "${#paths[@]}" -eq 0 ]; then
 fi
 
 printf "%-28s %-12s %-24s %s\n" "NAME" "PINNED" "SYNC" "REMOTE"
+printed=0
 for p in "${paths[@]}"; do
-  validate_gitmodules_path "${root}" "${p}"
+  # Skip submodules that are not skills (for example, a framework mount
+  # like .superpowers/ at the workspace root). The manager only reports
+  # on entries under the configured skills directory.
+  is_in_scope_submodule "${root}" "${p}" || continue
+  printed=$((printed + 1))
   name="$(basename "${p}")"
   url="$(git config -f .gitmodules --get "submodule.${p}.url" || echo "?")"
   pull_branch="$(skill_pull_branch "${p}")"
@@ -44,3 +49,7 @@ for p in "${paths[@]}"; do
   display_remote="${display_remote/\//:}"
   printf "%-28s %-12s %-24s %s\n" "${name}" "${sha}" "${sync_desc}" "${display_remote}"
 done
+
+if [ "${printed}" -eq 0 ]; then
+  echo "No skill submodules installed under the configured skills directory."
+fi

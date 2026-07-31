@@ -191,8 +191,17 @@ if [ "$1" = "--all" ]; then
   mapfile -t all_paths < <(submodule_names)
   [ "${#all_paths[@]}" -gt 0 ] || die "no submodules found in .gitmodules."
 
-  failed=()
+  # Silently skip out-of-scope submodules. See update.sh for the same
+  # pattern and rationale.
+  scoped_paths=()
   for p in "${all_paths[@]}"; do
+    is_in_scope_submodule "${root}" "${p}" || continue
+    scoped_paths+=("${p}")
+  done
+  [ "${#scoped_paths[@]}" -gt 0 ] || die "no skill submodules found under the configured skills directory."
+
+  failed=()
+  for p in "${scoped_paths[@]}"; do
     validate_gitmodules_path "${root}" "${p}"
     if ! sync_one "${p}"; then
       failed+=("${p}")

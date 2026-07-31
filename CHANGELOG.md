@@ -2,6 +2,27 @@
 
 All notable changes are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-07-31
+
+### Fixed
+
+- **Manager scripts died on out-of-scope submodules.** A workspace repo can legitimately host submodules that are not skills, for example a framework mount at `.superpowers/` used by [obra/superpowers](https://github.com/obra/superpowers). Before v0.3.1, `list.sh`, `update.sh --all`, `doctor.sh`, and `sync.sh --all` iterated every entry in `.gitmodules` and called `validate_gitmodules_path`, which killed the script with `error: refusing .gitmodules path outside skills dir 'skills': '.superpowers'.` The path guard exists to reject malformed and traversal paths from `.gitmodules`, not to police what other submodules a workspace may have.
+
+  Split into two functions in `scripts/_lib.sh`:
+
+  - `is_in_scope_submodule` returns 0 or 1 (silent). Callers that iterate every entry in `.gitmodules` skip out-of-scope entries with it. Same shape checks as before (no absolute paths, no `..`, must live under the configured skills directory, final component must be a valid skill name), just non-fatal.
+  - `validate_gitmodules_path` is unchanged and still dies on malformed paths, used when the caller has decided an entry is in-scope, or when the user handed a specific path expecting it to be a skill (`install.sh --reconfigure <name>`).
+
+  `list.sh`, `update.sh --all`, `doctor.sh`, and `sync.sh --all` now filter with `is_in_scope_submodule` before doing any work. Non-skill submodules do not appear in the table, do not run the doctor, and do not participate in `--all` operations. They are none of the manager's business.
+
+### Changed
+
+- **`doctor.sh` and `list.sh` message wording.** The final line of a healthy `doctor.sh` run now reads `all skill submodules healthy (N checked)` instead of `all submodules healthy`, and `list.sh` prints `No skill submodules installed under the configured skills directory.` when only non-skill submodules exist. The wording change makes it clear that the manager operates on a subset of `.gitmodules`, not the whole file.
+
+### Added
+
+- **Regression tests for out-of-scope entries.** `tests/list.bats` and `tests/doctor.bats` now install a `.superpowers/` submodule alongside a real skill and assert the manager reports the skill correctly and never touches the framework mount. `tests/test_helper.bash` gains `add_out_of_scope_submodule` for reuse. Total: 44 bats cases (up from 41).
+
 ## [0.3.0] — 2026-07-31
 
 ### Added

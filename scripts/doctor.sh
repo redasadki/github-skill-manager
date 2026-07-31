@@ -26,12 +26,22 @@ if [ "${#paths[@]}" -eq 0 ]; then
   exit 0
 fi
 
+checked=0
 for p in "${paths[@]}"; do
-  # Validate the path before letting it flow into any command below.
+  # Silently skip submodules that are not the manager's business. A path
+  # can be a framework mount (`.superpowers/`) or something else entirely;
+  # we only diagnose skill submodules living under the configured skills
+  # directory.
+  is_in_scope_submodule "${root}" "${p}" || continue
+
+  # In-scope but malformed name: report it. This should never happen in
+  # practice because is_in_scope_submodule already checks the shape, but
+  # keeps the guard explicit for future maintainers.
   if ! validate_gitmodules_path "${root}" "${p}" 2>/dev/null; then
     report "malformed .gitmodules entry: '${p}'" "edit .gitmodules and fix or remove the invalid entry"
     continue
   fi
+  checked=$((checked + 1))
 
   name="$(basename "${p}")"
   echo "checking ${p}"
@@ -122,9 +132,13 @@ for p in "${paths[@]}"; do
 done
 
 echo ""
+if [ "${checked}" -eq 0 ]; then
+  echo "No skill submodules installed under the configured skills directory."
+  exit 0
+fi
 if [ "${problems}" -eq 0 ]; then
-  echo "all submodules healthy."
+  echo "all skill submodules healthy (${checked} checked)."
 else
-  echo "found ${problems} problem(s)."
+  echo "found ${problems} problem(s) across ${checked} skill submodule(s)."
   exit 1
 fi

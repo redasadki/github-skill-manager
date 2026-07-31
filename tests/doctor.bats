@@ -19,7 +19,7 @@ teardown() { teardown_workspace; }
 
   run_doctor
   [ "${status}" -eq 0 ]
-  assert_output_contains "all submodules healthy"
+  assert_output_contains "all skill submodules healthy"
 }
 
 @test "doctor.sh: detects uncommitted changes in a submodule" {
@@ -66,6 +66,22 @@ teardown() { teardown_workspace; }
   run_doctor
   [ "${status}" -ne 0 ]
   assert_output_contains "defeats two-way sync"
+}
+
+@test "doctor.sh: silently ignores an out-of-scope submodule (regression)" {
+  add_out_of_scope_submodule ".superpowers" "framework"
+  make_fake_remote "sample-skill"
+  run_install "${FAKE_URL}"
+  [ "${status}" -eq 0 ]
+
+  run_doctor
+  [ "${status}" -eq 0 ]
+  assert_output_contains "all skill submodules healthy"
+  # Doctor must not have tried to check the framework submodule.
+  if [[ "${output}" == *"checking .superpowers"* ]]; then
+    printf 'expected .superpowers to be skipped, got:\n%s\n' "${output}" >&2
+    return 1
+  fi
 }
 
 @test "doctor.sh: unpushed commits with push branch suggest sync.sh" {

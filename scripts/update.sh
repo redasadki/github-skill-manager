@@ -146,8 +146,19 @@ if [ "$1" = "--all" ]; then
   mapfile -t all_paths < <(submodule_names)
   [ "${#all_paths[@]}" -gt 0 ] || die "no submodules found in .gitmodules."
 
-  failed=()
+  # Filter down to entries the manager owns. A workspace can freely host
+  # non-skill submodules (a framework mount, a fork of a shared repo) at
+  # paths outside the skills directory; update.sh --all silently ignores
+  # them.
+  scoped_paths=()
   for p in "${all_paths[@]}"; do
+    is_in_scope_submodule "${root}" "${p}" || continue
+    scoped_paths+=("${p}")
+  done
+  [ "${#scoped_paths[@]}" -gt 0 ] || die "no skill submodules found under the configured skills directory."
+
+  failed=()
+  for p in "${scoped_paths[@]}"; do
     validate_gitmodules_path "${root}" "${p}"
     if ! update_one "${p}"; then
       failed+=("${p}")

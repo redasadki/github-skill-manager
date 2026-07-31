@@ -111,6 +111,28 @@ run_remove()   { run bash "${SCRIPTS}/remove.sh"   "$@"; }
 run_list()     { run bash "${SCRIPTS}/list.sh"     "$@"; }
 run_doctor()   { run bash "${SCRIPTS}/doctor.sh"   "$@"; }
 
+# Add a non-skill submodule (for example, a framework mount) at an
+# arbitrary path OUTSIDE the skills directory. Used to prove the manager
+# silently ignores such entries instead of dying on them.
+#
+# Args:
+#   $1 = path relative to WORK, e.g. ".superpowers" or "vendor/other"
+#   $2 = repo basename for the fake remote (defaults to basename of $1)
+add_out_of_scope_submodule() {
+  local rel_path="$1"
+  local repo_name="${2:-$(basename "${rel_path}")}"
+  make_fake_remote "${repo_name}"
+  (
+    cd "${WORK}"
+    # The bare fake remotes do not carry a symbolic HEAD, so pass the
+    # branch explicitly. Real GitHub remotes usually publish HEAD, but
+    # local test bares do not by default.
+    git submodule add -b main "${FAKE_URL}" "${rel_path}"
+    git submodule update --init --recursive -- "${rel_path}"
+    git commit -q -m "Add out-of-scope submodule at ${rel_path}"
+  )
+}
+
 # Assert helper: fail with the captured output when the expected substring
 # is not found. Bats' built-in output is not always easy to eyeball.
 assert_output_contains() {
