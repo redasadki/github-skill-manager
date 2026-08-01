@@ -2,6 +2,12 @@
 
 All notable changes are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] — 2026-08-01
+
+### Added
+
+- **`MANUAL.md` for human operators.** Field manual for a person at a terminal, distinct from `SKILL.md` (which is the machine-facing contract for the agent). Covers first-time setup (`gh auth login` and `gh auth setup-git`), common tasks with ready-to-paste command blocks (install, update, sync, remove, list, doctor, edit-and-push), terminology (outer repo, pinned SHA, pointer drift, pull and push branches, out-of-scope submodules), a directory map of both the manager repo and a workspace that uses it, a troubleshooting section that catalogs the failure modes actually observed in real workspaces (credential-helper misconfiguration, `update.sh` refusing local commits, `sync.sh` reporting divergence, `doctor.sh` warning about missing `SKILL.md` in a bundle repo, pointer drift, `submodule add` colliding with plain files, out-of-scope submodule errors, terminal paste mangling), the four safety rules, and a short section on how `_lib.sh` ties the scripts together. Linked from `README.md` and `SKILL.md` so the agent points humans at it when they hit an error.
+
 ## [0.3.1] — 2026-07-31
 
 ### Fixed

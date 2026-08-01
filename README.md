@@ -26,6 +26,7 @@ All scripts are idempotent, non-interactive, and refuse to touch a submodule wit
 
 ## Read next
 
+- [`MANUAL.md`](MANUAL.md) for the human operator manual (setup, common tasks, troubleshooting, safety rules).
 - `SKILL.md` for the full agent-facing contract.
 - `references/submodule-guide.md` for the underlying model.
 - `references/design.md` for the security model and non-obvious design decisions.
