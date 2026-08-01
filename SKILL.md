@@ -1,31 +1,47 @@
 ---
 name: github-skill-manager
-description: "Install, update, sync, remove, list, and diagnose Agent Skills hosted on GitHub, mounted as git submodules under workspace/skills/. Use this skill when the user says install / add / set up a GitHub skill, update / bump / pull the latest for a skill, sync a skill two ways with GitHub, push local changes to the skill repo, remove / uninstall a skill, list installed skills, or diagnose / doctor a skill that is broken or drifted. Handles the two-level commit workflow and the two-way sync split between an upstream pull branch and a host-specific push branch (for example openclaw/2026.7.x) so local improvements are not clobbered by upstream fast-forwards. Triggers: use the github-skill-manager to set up the new X skill, install the epub2md skill from GitHub, update the translation skill, sync the translation skill both ways with GitHub, configure two-way sync for a skill, remove skill Y, list installed GitHub skills, doctor the skill setup, why is the skill directory empty after clone."
+description: "Install, update, sync, remove, list, and diagnose THIRD-PARTY Agent Skills hosted on GitHub, mounted as git submodules under workspace/skills/. IMPORTANT: before doing anything, determine which mode a skill is in. Skills the operator owns may live as plain tracked folders in the workspace monorepo, synced to their own repos with git subtree (scripts/skill-pull.sh and scripts/skill-push.sh in the workspace, if present); NEVER install, convert, or re-add those as submodules. Use this skill's scripts only for skills that are (or should be) submodules pointing at repos the operator does not own. Triggers: install a third-party skill from GitHub, update the dembrandt or postiz skills, update all third-party skills, remove a third-party skill, list installed skill submodules, doctor the skill submodule setup, why is the skill directory empty after clone."
 license: MIT
 metadata:
-  version: '0.3.2'
+  version: '0.3.3'
   author: Reda Sadki
   canonical_home: workspace/skills/github-skill-manager
 ---
 
 # github-skill-manager
 
-Install and maintain GitHub-hosted Agent Skills as git submodules under `workspace/skills/`. The outer workspace repo pins each skill at a specific commit. The inner skill repo remains the canonical source of the skill.
+Install and maintain third-party GitHub-hosted Agent Skills as git submodules under `workspace/skills/`. The outer workspace repo pins each skill at a specific commit. The inner skill repo remains the canonical source of the skill.
+
+## Two modes: check before doing anything
+
+A workspace can hold skills in two different modes. Determine the mode of a skill before running any command on it:
+
+| Mode | How to recognize it | Who manages it |
+|---|---|---|
+| **Plain folder (monorepo mode)** | `skills/<name>/` has NO `.git` entry and its files ARE tracked by the outer repo (`git ls-files skills/<name>` prints files). | Ordinary git. Edit, `git add`, `git commit`, `git push` in the workspace. If the workspace has `scripts/skill-pull.sh` and `scripts/skill-push.sh`, those sync the folder with the skill's own repo via `git subtree`. |
+| **Submodule** | `skills/<name>/.git` exists (file or directory) and `.gitmodules` has a `[submodule "skills/<name>"]` block. | THIS skill's scripts. |
+
+Rules that follow from the modes:
+
+- **Never install, convert, or re-add a plain-folder skill as a submodule.** If the operator owns the skill and it lives as a plain folder, it is in monorepo mode on purpose. Adding it as a submodule again would recreate the two-level-commit problem the monorepo removed.
+- **Skills the operator owns** (same GitHub account as the workspace remote) are normally in monorepo mode. **Skills from other people's repos** are normally submodules and are this skill's job.
+- When asked to "update all skills", update the submodules with `update.sh --all` and leave plain folders alone (they update through normal git pulls of the workspace).
 
 ## When to use this skill
 
-Use this skill whenever the user says any of:
+Use this skill whenever the user says any of the following about a THIRD-PARTY skill (a repo the operator does not own):
 
 - Install / add / set up the `<name>` skill (from a GitHub repo).
 - Update / bump / pull the latest for the `<name>` skill.
 - Remove / uninstall the `<name>` skill.
-- List installed skills / what skills are installed from GitHub.
-- Diagnose / doctor / check / fix the skill setup.
+- List installed skill submodules.
+- Diagnose / doctor / check / fix the skill submodule setup.
 - Reports of empty skill directories after cloning the workspace, uncommitted submodule content, or "modified content" showing in `git status`.
 
 Do not use this skill for:
 
-- Building or authoring a new skill from scratch. Use `create-skill` for that, then hand off to this skill to install the resulting repo.
+- Skills in plain-folder (monorepo) mode. Use ordinary git, and the workspace's `scripts/skill-pull.sh` / `scripts/skill-push.sh` helpers for syncing with their own repos.
+- Building or authoring a new skill from scratch. Use `create-skill` for that. If the resulting skill belongs to the operator, import it as a plain folder (`git subtree add --prefix=skills/<name> <url> main`); only hand off to this skill if it is third-party.
 - Skills that ship as tarballs, PyPI packages, or copies of files. This skill only manages skills whose canonical source is a GitHub repository.
 
 ## Preconditions
@@ -40,15 +56,20 @@ If any precondition fails, stop and report to the user rather than trying to wor
 
 Each skill is mounted at `workspace/skills/<skill-name>/`. The directory name must match the skill's `name` field in its `SKILL.md`. The outer workspace repo records the submodule in `.gitmodules` at the workspace root.
 
-Example, after installing three skills:
+Example of a mixed-mode workspace:
 
 ```
 workspace/
-├── .gitmodules
+├── .gitmodules              <-- lists ONLY the submodules
+├── scripts/
+│   ├── skill-mirrors.txt    <-- monorepo mode: name -> repo URL map
+│   ├── skill-pull.sh        <-- monorepo mode: repo -> workspace sync
+│   └── skill-push.sh        <-- monorepo mode: workspace -> repo sync
 └── skills/
-    ├── epub2md/           <-- submodule -> github.com/redasadki/epub2md
-    ├── translation/       <-- submodule -> github.com/redasadki/translation
-    └── github-skill-manager/  <-- this skill
+    ├── epub2md/             <-- plain folder (operator-owned, monorepo mode)
+    ├── translation/         <-- plain folder (operator-owned, monorepo mode)
+    ├── postiz/              <-- submodule -> github.com/gitroomhq/postiz-agent
+    └── github-skill-manager/  <-- this skill (may be either mode)
 ```
 
 ## Subcommands

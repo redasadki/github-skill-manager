@@ -2,6 +2,13 @@
 
 All notable changes are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] — 2026-08-01
+
+### Changed
+
+- **Documentation rewritten for the two-mode world.** Workspaces can now hold skills in two modes: plain tracked folders inside the workspace monorepo (normal for skills the operator owns, synced to their own repos with `git subtree` via workspace-level `scripts/skill-pull.sh` and `scripts/skill-push.sh` helpers), and git submodules (normal for third-party skills, managed by this skill). `SKILL.md` gains a "Two modes: check before doing anything" section with recognition commands and the rules that follow, and its frontmatter description now scopes this skill to third-party submodules explicitly, so an agent session never re-installs an operator-owned plain-folder skill as a submodule. `MANUAL.md` gains the matching operator-facing section and scopes the rest of the manual to submodule mode. The mixed-mode workspace layout example replaces the all-submodule one.
+- **No behavior changes.** Scripts are untouched. `install.sh` already refuses to overwrite an existing directory, which mechanically enforces the new hard rule (never convert a plain-folder skill back into a submodule).
+
 ## [0.3.2] — 2026-08-01
 
 ### Added

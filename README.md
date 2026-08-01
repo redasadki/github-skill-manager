@@ -1,6 +1,8 @@
 # github-skill-manager
 
-An Agent Skill that installs, updates, two-way syncs, removes, lists, and diagnoses other Agent Skills hosted on GitHub, mounted as git submodules under `workspace/skills/`.
+An Agent Skill that installs, updates, two-way syncs, removes, lists, and diagnoses third-party Agent Skills hosted on GitHub, mounted as git submodules under `workspace/skills/`.
+
+Operator-owned skills may instead live as plain tracked folders inside the workspace monorepo, synced to their own repos with `git subtree`. This skill does not manage those: see the "Two modes" sections of `SKILL.md` and `MANUAL.md` before running anything.
 
 Use it when the user says any of:
 

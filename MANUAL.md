@@ -7,6 +7,7 @@ If you are a fresh operator: read [Setup](#setup) once, then jump to [Common tas
 ## Table of contents
 
 - [Setup](#setup)
+- [Two modes: plain folders and submodules](#two-modes-plain-folders-and-submodules)
 - [Common tasks](#common-tasks)
   - [Install a new skill](#install-a-new-skill)
   - [Update a skill](#update-a-skill)
@@ -45,9 +46,34 @@ Two things must be true before any script runs cleanly.
 
 If pushes are still prompting for a username, see [Troubleshooting → Push prompts for a username](#push-prompts-for-a-username).
 
+## Two modes: plain folders and submodules
+
+Since August 2026, a workspace can hold skills in two modes. Check the mode before running any command on a skill:
+
+```bash
+# Is it a submodule? (prints a .git path if yes)
+ls skills/<name>/.git 2>/dev/null
+
+# Is it a plain folder tracked by the workspace? (prints files if yes)
+git ls-files skills/<name> | head -3
+```
+
+**Plain folder (monorepo mode).** The skill's files are ordinary tracked content of the workspace repo. This is the normal mode for skills the operator owns. Daily work is plain git: edit, `git add`, `git commit`, `git push`. If the skill also has its own GitHub repo (for development sessions in other tools, or public sharing), the workspace-level helpers sync the two:
+
+```bash
+bash scripts/skill-pull.sh <name>    # skill repo -> workspace folder
+bash scripts/skill-push.sh <name>    # workspace folder -> skill repo
+```
+
+The name-to-URL map lives in `scripts/skill-mirrors.txt`. These helpers wrap `git subtree` and are part of the workspace, not of this skill.
+
+**Submodule mode.** The skill is pinned in `.gitmodules` and has its own `.git`. This is the normal mode for third-party skills. Everything in the rest of this manual applies to this mode only.
+
+**The one hard rule:** never convert a plain-folder skill into a submodule, and never run this skill's `install.sh` for a skill that already exists as a plain folder. The monorepo mode was chosen deliberately to remove the two-level commit workflow; reinstalling as a submodule brings the problem back.
+
 ## Common tasks
 
-Every task in this section assumes you are at the workspace root. When in doubt, run `pwd`; you should be at the folder that contains `.gitmodules` and `skills/`.
+Every task in this section applies to SUBMODULE-mode skills and assumes you are at the workspace root. When in doubt, run `pwd`; you should be at the folder that contains `.gitmodules` and `skills/`. For plain-folder skills, use ordinary git as described in [Two modes](#two-modes-plain-folders-and-submodules).
 
 ### Install a new skill
 
