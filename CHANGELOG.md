@@ -2,6 +2,12 @@
 
 All notable changes are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.5] — 2026-08-02
+
+### Changed
+
+- **Documented the mirror registration step for owned skills.** The monorepo-mode import instruction told the agent to `git subtree add` an operator-owned skill but never said to register the mapping in `scripts/skill-mirrors.txt`, which is the only place `skill-pull.sh` and `skill-push.sh` resolve URLs from. An imported or newly mirrored skill therefore had no sync path and diverged silently (observed with `tglf-visual-design`, mirrored on 2 August 2026 without a registry line). `SKILL.md` now carries an explicit mode rule and an amended import instruction: create or import the mirror AND add the `<name> <url>` line to `scripts/skill-mirrors.txt` in the same commit.
+
 ## [0.3.4] — 2026-08-02
 
 ### Changed

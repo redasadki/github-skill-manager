@@ -3,7 +3,7 @@ name: github-skill-manager
 description: "Install, update, sync, remove, list, and diagnose THIRD-PARTY Agent Skills hosted on GitHub, mounted as git submodules under workspace/skills/. IMPORTANT: before doing anything, determine which mode a skill is in. Skills the operator owns may live as plain tracked folders in the workspace monorepo, synced to their own repos with git subtree (scripts/skill-pull.sh and scripts/skill-push.sh in the workspace, if present); NEVER install, convert, or re-add those as submodules. Use this skill's scripts only for skills that are (or should be) submodules pointing at repos the operator does not own. Triggers: install a third-party skill from GitHub, update the dembrandt or postiz skills, update all third-party skills, remove a third-party skill, list installed skill submodules, doctor the skill submodule setup, why is the skill directory empty after clone."
 license: MIT
 metadata:
-  version: '0.3.4'
+  version: '0.3.5'
   author: Reda Sadki
   canonical_home: workspace/skills/github-skill-manager
 ---
@@ -26,6 +26,7 @@ Rules that follow from the modes:
 - **Never install, convert, or re-add a plain-folder skill as a submodule.** If the operator owns the skill and it lives as a plain folder, it is in monorepo mode on purpose. Adding it as a submodule again would recreate the two-level-commit problem the monorepo removed.
 - **Skills the operator owns** (same GitHub account as the workspace remote) are normally in monorepo mode. **Skills from other people's repos** are normally submodules and are this skill's job.
 - When asked to "update all skills", update the submodules with `update.sh --all` and leave plain folders alone (they update through normal git pulls of the workspace).
+- **Every plain-folder skill that has its own mirror repo MUST be registered in `scripts/skill-mirrors.txt`** (one line: `<name> <url>`). The `skill-pull.sh` and `skill-push.sh` helpers resolve URLs exclusively through that file; an unregistered mirror has no sync path and diverges silently. Whenever you create a mirror repo for an owned skill, or import an owned skill that already has one, add the line in the same commit.
 
 ## When to use this skill
 
@@ -41,7 +42,7 @@ Use this skill whenever the user says any of the following about a THIRD-PARTY s
 Do not use this skill for:
 
 - Skills in plain-folder (monorepo) mode. Use ordinary git, and the workspace's `scripts/skill-pull.sh` / `scripts/skill-push.sh` helpers for syncing with their own repos.
-- Building or authoring a new skill from scratch. Use `create-skill` for that. If the resulting skill belongs to the operator, import it as a plain folder (`git subtree add --prefix=skills/<name> <url> main`); only hand off to this skill if it is third-party.
+- Building or authoring a new skill from scratch. Use `create-skill` for that. If the resulting skill belongs to the operator, import it as a plain folder (`git subtree add --prefix=skills/<name> <url> main`) AND register the mirror in `scripts/skill-mirrors.txt` in the same commit, so `skill-pull.sh` and `skill-push.sh` can sync it; only hand off to this skill if it is third-party.
 - Skills that ship as tarballs, PyPI packages, or copies of files. This skill only manages skills whose canonical source is a GitHub repository.
 
 ## Preconditions
