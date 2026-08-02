@@ -3,7 +3,7 @@ name: github-skill-manager
 description: "Install, update, sync, remove, list, and diagnose THIRD-PARTY Agent Skills hosted on GitHub, mounted as git submodules under workspace/skills/. IMPORTANT: before doing anything, determine which mode a skill is in. Skills the operator owns may live as plain tracked folders in the workspace monorepo, synced to their own repos with git subtree (scripts/skill-pull.sh and scripts/skill-push.sh in the workspace, if present); NEVER install, convert, or re-add those as submodules. Use this skill's scripts only for skills that are (or should be) submodules pointing at repos the operator does not own. Triggers: install a third-party skill from GitHub, update the dembrandt or postiz skills, update all third-party skills, remove a third-party skill, list installed skill submodules, doctor the skill submodule setup, why is the skill directory empty after clone."
 license: MIT
 metadata:
-  version: '0.3.3'
+  version: '0.3.4'
   author: Reda Sadki
   canonical_home: workspace/skills/github-skill-manager
 ---

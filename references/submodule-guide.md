@@ -1,5 +1,7 @@
 # Skills as submodules: the model
 
+> **Scope: submodule mode only.** This document applies to skills mounted as git submodules (normally third-party skills). Skills the operator owns may instead live as plain tracked folders in the workspace monorepo, synced with `git subtree` via the workspace's `scripts/skill-pull.sh` and `scripts/skill-push.sh`. For those, none of this document applies: use ordinary git. See the "Two modes" section of `SKILL.md`.
+
 This is the full guide to using GitHub-hosted Agent Skills inside a workspace repo that is itself under version control.
 
 ## The problem

@@ -1,5 +1,7 @@
 # Worked example: two-way sync with an OpenClaw branch
 
+> **Scope: submodule mode only.** This document applies to skills mounted as git submodules (normally third-party skills). Skills the operator owns may instead live as plain tracked folders in the workspace monorepo, synced with `git subtree` via the workspace's `scripts/skill-pull.sh` and `scripts/skill-push.sh`. For those, none of this document applies: use ordinary git. See the "Two modes" section of `SKILL.md`. **Historical example.** The workspace this example was written for migrated to monorepo mode on 1 August 2026, and the translation skill is now a plain folder there. The push-branch workflow below remains valid only for submodule-mode setups.
+
 Scenario: I run OpenClaw 2026.7.x on Doha, and I want to install `redasadki/translation` so:
 
 - upstream improvements to the translation skill land on `main` and I can pull them into my workspace,

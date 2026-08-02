@@ -1,5 +1,7 @@
 # Troubleshooting
 
+> **Scope: submodule mode only.** This document applies to skills mounted as git submodules (normally third-party skills). Skills the operator owns may instead live as plain tracked folders in the workspace monorepo, synced with `git subtree` via the workspace's `scripts/skill-pull.sh` and `scripts/skill-push.sh`. For those, none of this document applies: use ordinary git. See the "Two modes" section of `SKILL.md`.
+
 Recipes for the failure modes you will see most often. All commands assume you are at the workspace repo root, and that `<path>` is `workspace/skills/<name>`.
 
 ## Empty skill directory after cloning the workspace

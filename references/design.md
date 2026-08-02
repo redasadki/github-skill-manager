@@ -1,5 +1,7 @@
 # Design notes
 
+> **Scope: submodule mode only.** This document applies to skills mounted as git submodules (normally third-party skills). Skills the operator owns may instead live as plain tracked folders in the workspace monorepo, synced with `git subtree` via the workspace's `scripts/skill-pull.sh` and `scripts/skill-push.sh`. For those, none of this document applies: use ordinary git. See the "Two modes" section of `SKILL.md`.
+
 This document records the design decisions behind the scripts. It exists because several of the choices look like belt-and-suspenders paranoia, and future maintainers should not undo them without understanding what they defend against.
 
 ## The two-level commit rule

@@ -2,6 +2,12 @@
 
 All notable changes are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] — 2026-08-02
+
+### Changed
+
+- **Scoped every reference and example to submodule mode.** v0.3.3 updated the four top-level documents but left `references/submodule-guide.md`, `references/design.md`, `references/troubleshooting.md`, `references/two-way-sync.md`, `examples/install-translation.md`, and `examples/openclaw-branch.md` describing an all-submodule world. Each now opens with a scope preamble stating it applies to submodule mode only, with pointers to the "Two modes" section of `SKILL.md`. Two files carry stronger warnings: the retroactive migration procedure in `two-way-sync.md` must not be applied to operator-owned skills that are already plain folders, and `openclaw-branch.md` is marked historical because the workspace it describes migrated to monorepo mode on 1 August 2026.
+
 ## [0.3.3] — 2026-08-01
 
 ### Changed

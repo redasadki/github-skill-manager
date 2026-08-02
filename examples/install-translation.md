@@ -1,5 +1,7 @@
 # Example: install the translation skill
 
+> **Scope: submodule mode only.** This document applies to skills mounted as git submodules (normally third-party skills). Skills the operator owns may instead live as plain tracked folders in the workspace monorepo, synced with `git subtree` via the workspace's `scripts/skill-pull.sh` and `scripts/skill-push.sh`. For those, none of this document applies: use ordinary git. See the "Two modes" section of `SKILL.md`. **This example shows a submodule-mode install. For an operator-owned skill, prefer a plain-folder import: `git subtree add --prefix=skills/<name> <url> main`.**
+
 Assume the user says:
 
 > Use the github-skill-manager to set up the new `translation` skill.

@@ -1,5 +1,7 @@
 # Two-way sync
 
+> **Scope: submodule mode only.** This document applies to skills mounted as git submodules (normally third-party skills). Skills the operator owns may instead live as plain tracked folders in the workspace monorepo, synced with `git subtree` via the workspace's `scripts/skill-pull.sh` and `scripts/skill-push.sh`. For those, none of this document applies: use ordinary git. See the "Two modes" section of `SKILL.md`. **The retroactive migration procedure below predates the monorepo migration of 1 August 2026: do not apply it to operator-owned skills that are already plain folders.**
+
 This document describes the branch model, the state machine, the retroactive migration procedure for skills that already have local commits, and the failure modes that `sync.sh` deliberately refuses to automate.
 
 Read this after `SKILL.md` when you need to reason about a case the SKILL.md tables do not cover.
